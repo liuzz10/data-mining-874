@@ -25,12 +25,12 @@ api = tweepy.API(auth, wait_on_rate_limit=True)
 ##############################
 
 count_for_query = 100   # for search, maximum 100
+pages_to_query = 1000
 count_for_timeline_query = 50    # for query a user's timeline
 language = "en"
 n_gram_size = 3
 training_set_size = 10
 most_informative_features_size = 15
-pages_to_query = 250
 top_n_words = 3000
 
 
@@ -46,6 +46,7 @@ drug_keywords_all = drug_keywords + drug_keywords_variants
 abuse_keywords = ["too many", "too much", "overdose", "strong enough", "max", 'alcohol', 'happy pills', 'enough', 'not enough', 'rely', 'stressful', 'stress', 'inject', 'anxiety', 'anxious', 'dizz', 'faint', 'headache', 'shaky']
 risk_keywords = abuse_keywords + drug_keywords
 
+# from paper "Comparative Analysis of Patient Distress in Opioid Treatment Programs using Natural Language Processing"
 mental_distress_keywords = ["anxiety", "depression", "adhd", "insomnia", "psychiatric disorders", "borderline personality disorder", "ptsd disorders", "substance induced psychological disorders", "dissociative identity disorder", "multiple personality disorder", "panic disorder"]
 legal_distress_keywords = ["legal", "problems", "issues", "criminal", "arrest", "prison", "incarcerations"]
 
@@ -111,19 +112,23 @@ def get_high_risk_users_and_tweets(api, users, keywords, threshold=1):
             risk_tweets += risk_tweets_per_user
     return risk_tweets
         
-def filter_tweets_by_keywords(filename, keywords, threshold=1):
+
+def filter_tweets_by_keywords(input_filename, output_filename, keywords, **threshold):
     filtered_tweets = []
-    tweets = open_file(filename)
+    tweets = open_file(input_filename)
     for user_name, tweet in tweets:
         words = set(word_tokenize(tweet))
-        count_risk_terms = 0
+        keywords_contained = []
         for keyword in keywords:
-            if count_risk_terms >= threshold:
-                break
             if keyword in words:
-                count_risk_terms += 1
-        filtered_tweets.append((user_name, tweets))
-    with open("filter_tweets_by_keywords.csv", "w", newline="") as f:
+                keywords_contained.append(keyword)
+        if threshold:
+            if len(keywords_contained) >= threshold:
+                filtered_tweets.append([user_name, keywords_contained, tweet])
+        else:
+            filtered_tweets.append([user_name, keywords_contained, tweet])
+    filtered_tweets.sort(key = lambda x:len(x[1]), reverse=True)
+    with open(output_filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(filtered_tweets)
                 
@@ -169,8 +174,8 @@ def open_file(filename):
 # print("total N of tweets of 1+ drug_key_words", len(all_tweets))
 # all_users = set([tweet.user.screen_name for tweet in all_tweets])
 # print("N users who has posted drug_key_words", len(all_users))
-# write_tweets_to_csv(all_tweets, "all_tweets.csv")
-# write_list_to_csv(all_users, "all_users.csv")
+# write_tweets_to_csv(all_tweets, "opioid_tweets(2nd).csv")
+# write_list_to_csv(all_users, "opioid_users(2nd).csv")
 
 ####### Next Step. get "high-risk" users ########
 
@@ -188,7 +193,8 @@ def open_file(filename):
 
 # Alternatively
 
-filter_tweets_by_keywords("opioid_tweets.csv", abuse_keywords + legal_distress_keywords + mental_distress_keywords, threshold=2)
+keywords = set(abuse_keywords + legal_distress_keywords + mental_distress_keywords)
+filter_tweets_by_keywords("opioid_tweets(2nd).csv", "filter_tweets_by_keywords(2nd).csv", keywords)
 
 
 ##############################
